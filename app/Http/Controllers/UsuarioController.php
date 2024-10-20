@@ -2,70 +2,61 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Section;
+use App\Models\Usuario; // Asegúrate de que este modelo exista
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Validator;
 
-class SectionsController extends Controller
+class UsuariosController extends Controller
 {
     public function index(Request $request) {
-
-        if(!empty($request->records_per_page)) {
-
-            $request->records_per_page = $request->records_per_page <= env('PAGINATION_MAX_SIZE') ? $request->records_per_page
-                                                                                                  : env('PAGINATION_MAX_SIZE');
-
+        // Manejo de paginación
+        if (!empty($request->records_per_page)) {
+            $request->records_per_page = $request->records_per_page <= env('PAGINATION_MAX_SIZE') ? 
+                                          $request->records_per_page : 
+                                          env('PAGINATION_MAX_SIZE');
         } else {
-
             $request->records_per_page = env('PAGINATION_DEFAULT_SIZE');
         }
 
-        $sections = Section::where('name', 'LIKE', "%$request->filter%")
+        // Búsqueda de usuarios
+        $usuarios = Usuario::where('nombre', 'LIKE', "%$request->filter%")
                            ->paginate($request->records_per_page);
 
-        return view('sections/index', ['sections' => $sections,
-                                       'data' => $request]);
+        return view('usuarios/index', ['usuarios' => $usuarios, 'data' => $request]);
     }
 
     public function create() {
-
-        return view('sections/create');
+        return view('usuarios/create');
     }
 
     public function edit($id) {
+        $usuario = Usuario::find($id);
 
-        $section = Section::find($id);
-
-        if (empty($section)) {
-
-            Session::flash('message', ['content' => "La sección con id '$id' no existe.", 'type' => 'error']);
+        if (empty($usuario)) {
+            Session::flash('message', ['content' => "El usuario con id '$id' no existe.", 'type' => 'error']);
             return redirect()->back();
         }
 
-        return view('sections/edit', ['section' => $section]);
+        return view('usuarios/edit', ['usuario' => $usuario]);
     }
 
     public function delete($id) {
+        try {
+            $usuario = Usuario::find($id);
 
-        try{
-
-            $section = Section::find($id);
-
-            if (empty($section)) {
-
-                Session::flash('message', ['content' => "La sección con id '$id' no existe.", 'type' => 'error']);
+            if (empty($usuario)) {
+                Session::flash('message', ['content' => "El usuario con id '$id' no existe.", 'type' => 'error']);
                 return redirect()->back();
             }
 
-            $section->delete();
+            $usuario->delete();
 
-            Session::flash('message', ['content' => 'Sección eliminada con éxito', 'type' => 'success']);
-            return redirect()->action([SectionsController::class, 'index']);
+            Session::flash('message', ['content' => 'Usuario eliminado con éxito', 'type' => 'success']);
+            return redirect()->action([UsuariosController::class, 'index']);
 
-        } catch(Exception $ex) {
-
+        } catch (Exception $ex) {
             Log::error($ex);
             Session::flash('message', ['content' => 'Ha ocurrido un error', 'type' => 'error']);
             return redirect()->back();
@@ -73,26 +64,31 @@ class SectionsController extends Controller
     }
 
     public function store(Request $request) {
-
         Validator::make($request->all(), [
-            'name' => 'required|max:64'
+            'nombre' => 'required|max:30',
+            'cedula' => 'required|unique:usuarios,cedula|digits_between:1,20', // Ajusta según sea necesario
+            'rol' => 'required|integer'
         ],
         [
-            'name.required' => 'El nombre es requerido.',
-            'name.max' => 'El nombre no puede ser mayor a :max carácteres.',
+            'nombre.required' => 'El nombre es requerido.',
+            'nombre.max' => 'El nombre no puede ser mayor a :max caracteres.',
+            'cedula.required' => 'La cédula es requerida.',
+            'cedula.unique' => 'La cédula ya está en uso.',
+            'rol.required' => 'El rol es requerido.',
         ])->validate();
 
         try {
+            $usuario = new Usuario();
+            $usuario->cedula = $request->cedula;
+            $usuario->nombre = $request->nombre;
+            $usuario->rol = $request->rol;
+            $usuario->fecha_creacion = now(); // Asegúrate de que el formato sea correcto
+            $usuario->save();
 
-            $section = new Section();
-            $section->name = $request->name;
-            $section->save();
+            Session::flash('message', ['content' => 'Usuario agregado con éxito', 'type' => 'success']);
+            return redirect()->action([UsuariosController::class, 'index']);
 
-            Session::flash('message', ['content' => 'Sección agregada con éxito', 'type' => 'success']);
-            return redirect()->action([SectionsController::class, 'index']);
-
-        } catch(Exeption $ex) {
-
+        } catch (Exception $ex) {
             Log::error($ex);
             Session::flash('message', ['content' => 'Ha ocurrido un error', 'type' => 'error']);
             return redirect()->back();
@@ -100,27 +96,26 @@ class SectionsController extends Controller
     }
 
     public function update(Request $request) {
-
         Validator::make($request->all(), [
-            'name' => 'required|max:64',
-            'section_id' => 'required|exists:sections,id'
+            'nombre' => 'required|max:30',
+            'cedula' => 'required|exists:usuarios,cedula',
+            'rol' => 'required|integer'
         ],
         [
-            'name.required' => 'El nombre es requerido.',
-            'name.max' => 'El nombre no puede ser mayor a :max carácteres.',
+            'nombre.required' => 'El nombre es requerido.',
+            'nombre.max' => 'El nombre no puede ser mayor a :max caracteres.',
         ])->validate();
 
         try {
+            $usuario = Usuario::find($request->cedula);
+            $usuario->nombre = $request->nombre;
+            $usuario->rol = $request->rol;
+            $usuario->save();
 
-            $section = Section::find($request->section_id);
-            $section->name = $request->name;
-            $section->save();
+            Session::flash('message', ['content' => 'Usuario actualizado con éxito', 'type' => 'success']);
+            return redirect()->action([UsuariosController::class, 'index']);
 
-            Session::flash('message', ['content' => 'Sección actualizada con éxito', 'type' => 'success']);
-            return redirect()->action([SectionsController::class, 'index']);
-
-        } catch(Exeption $ex) {
-
+        } catch (Exception $ex) {
             Log::error($ex);
             Session::flash('message', ['content' => 'Ha ocurrido un error', 'type' => 'error']);
             return redirect()->back();
