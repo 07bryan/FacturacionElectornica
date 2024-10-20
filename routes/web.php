@@ -6,4 +6,4 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-include('web/sections.php');
+include('web/usuarios.php');
